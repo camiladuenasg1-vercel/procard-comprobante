@@ -1,4 +1,3 @@
-import Image from "next/image";
 import Link from "next/link";
 import {
   Check,
@@ -92,7 +91,8 @@ export default async function ComprobantePage({
 
       <div className="relative z-10 flex w-full max-w-sm flex-col items-center gap-5">
         <header className="flex items-center gap-2">
-          <Image
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
             src="/brands/redpro-color.png"
             alt="PROCARD"
             width={28}
@@ -135,12 +135,11 @@ export default async function ComprobantePage({
           <div className="flex items-center justify-center gap-4 border-t border-border bg-muted/40 px-5 py-4">
             {(canal?.toLowerCase() === "tap2phone" ? OPEN_BRANDS : PROCARD_BRANDS).map(
               (b) => (
-                <Image
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
                   key={b.slug}
                   src={`/brands/${b.file}`}
                   alt={b.label}
-                  width={40}
-                  height={22}
                   className="h-[18px] w-auto object-contain opacity-90"
                 />
               ),
@@ -178,7 +177,8 @@ function EmptyState() {
     <main className="relative flex min-h-dvh flex-col items-center justify-center overflow-hidden px-6 py-10 text-center">
       <Backdrop />
       <div className="relative z-10 flex w-full max-w-xs flex-col items-center gap-5">
-        <Image
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
           src="/brands/redpro-color.png"
           alt="PROCARD"
           width={56}
