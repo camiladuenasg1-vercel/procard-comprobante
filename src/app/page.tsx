@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import {
   Check,
@@ -5,9 +6,16 @@ import {
   Radio,
   CreditCard,
   CalendarClock,
+  Store,
   ShieldCheck,
   Sparkles,
 } from "lucide-react";
+
+export const metadata: Metadata = {
+  title: "Comprobante PROCARD",
+  // Página pública con importes y números de operación: no debe indexarse.
+  robots: { index: false, follow: false },
+};
 
 const gs = new Intl.NumberFormat("es-PY", {
   style: "currency",
@@ -15,11 +23,19 @@ const gs = new Intl.NumberFormat("es-PY", {
   maximumFractionDigits: 0,
 });
 
-const CANAL_LABEL: Record<string, string> = {
-  tap2phone: "Tap para cobrar",
-  pago_link: "Link de pago",
-  qr: "QR",
-};
+/**
+ * Quien lee esta pantalla es el CLIENTE que pagó, no el comercio: los canales
+ * se nombran desde su lado ("pago sin contacto", no "tap para cobrar").
+ *
+ * Es un Map y no un objeto literal a propósito: con `Record` un `canal` como
+ * `constructor` o `__proto__` devolvía algo heredado de Object.prototype y
+ * React reventaba con 500 al intentar renderizar una función como hijo.
+ */
+const CANAL_LABEL = new Map([
+  ["tap2phone", "Pago sin contacto"],
+  ["pago_link", "Link de pago"],
+  ["qr", "QR"],
+]);
 
 type Brand = { slug: string; label: string; file: string };
 const OPEN_BRANDS: Brand[] = [
@@ -52,35 +68,52 @@ export default async function ComprobantePage({
 
   const ref = get("ref");
   const monto = get("monto");
-  const canal = get("canal");
-  const marca = get("marca");
-  const tarjeta = get("tarjeta");
+  const canal = get("canal")?.trim().toLowerCase() || null;
+  const marca = get("marca")?.trim() || null;
+  const tarjeta = get("tarjeta")?.trim() || null;
   const fecha = get("fecha");
+  const comercio = get("comercio")?.trim() || null;
 
-  if (!ref || !monto) {
+  // El importe tiene que ser un entero positivo de guaraníes. Sin esta guarda
+  // `monto=abc`, `-5000`, `0` o `Infinity` se imprimían crudos a 36px en el
+  // lugar donde va la plata.
+  const montoNum = /^\d+$/.test(monto ?? "") ? Number(monto) : NaN;
+  if (!ref || !Number.isSafeInteger(montoNum) || montoNum <= 0) {
     return <EmptyState />;
   }
 
-  const montoNum = Number(monto);
-  const fechaFmt = fecha
-    ? new Date(fecha).toLocaleString("es-PY", {
-        day: "2-digit",
-        month: "2-digit",
-        year: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-      })
-    : null;
+  // Asunción, no UTC: con `fecha` en Z el comprobante mostraba la hora (y a
+  // veces el día) equivocados para quien lo está leyendo acá.
+  const fechaDate = fecha ? new Date(fecha) : null;
+  const fechaFmt =
+    fechaDate && !Number.isNaN(fechaDate.getTime())
+      ? fechaDate.toLocaleString("es-PY", {
+          timeZone: "America/Asuncion",
+          day: "2-digit",
+          month: "2-digit",
+          year: "numeric",
+          hour: "2-digit",
+          minute: "2-digit",
+        })
+      : null;
 
   const rows: { icon: typeof Hash; label: string; value: string }[] = [
+    ...(comercio ? [{ icon: Store, label: "Comercio", value: comercio }] : []),
     { icon: Hash, label: "N.º de operación", value: ref },
     {
       icon: Radio,
       label: "Canal",
-      value: (canal && CANAL_LABEL[canal.toLowerCase()]) ?? canal ?? "—",
+      value: (canal && CANAL_LABEL.get(canal)) ?? "—",
     },
-    ...(marca && tarjeta
-      ? [{ icon: CreditCard, label: "Tarjeta", value: `${marca} ····${tarjeta}` }]
+    // Solo los últimos 4 dígitos, aunque el QR mande el PAN entero.
+    ...(tarjeta
+      ? [
+          {
+            icon: CreditCard,
+            label: "Tarjeta",
+            value: `${marca ? `${marca} ` : ""}····${tarjeta.slice(-4)}`,
+          },
+        ]
       : []),
     ...(fechaFmt ? [{ icon: CalendarClock, label: "Fecha y hora", value: fechaFmt }] : []),
   ];
@@ -111,10 +144,10 @@ export default async function ComprobantePage({
               <Check className="size-8" strokeWidth={3} />
             </span>
             <p className="relative mt-3 text-sm font-medium opacity-85">
-              Cobro aprobado
+              Pago aprobado
             </p>
             <p className="relative mt-1 font-mono text-[36px] font-bold leading-none tracking-tight">
-              {Number.isFinite(montoNum) ? gs.format(montoNum) : monto}
+              {gs.format(montoNum)}
             </p>
           </div>
 
@@ -124,8 +157,10 @@ export default async function ComprobantePage({
                 <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
                   <Icon className="size-4" />
                 </span>
-                <dt className="flex-1 text-muted-foreground">{label}</dt>
-                <dd className="text-right font-semibold">{value}</dd>
+                <dt className="shrink-0 text-muted-foreground">{label}</dt>
+                <dd className="min-w-0 flex-1 break-all text-right font-semibold">
+                  {value}
+                </dd>
               </div>
             ))}
           </dl>
@@ -133,7 +168,7 @@ export default async function ComprobantePage({
           {/* Marcas aceptadas — abiertas (Visa/Mastercard) para Tap2Phone,
               propias de PROCARD (Única/Credicard) para el resto. */}
           <div className="flex items-center justify-center gap-4 border-t border-border bg-muted/40 px-5 py-4">
-            {(canal?.toLowerCase() === "tap2phone" ? OPEN_BRANDS : PROCARD_BRANDS).map(
+            {(canal === "qr" || canal === "pago_link" ? PROCARD_BRANDS : OPEN_BRANDS).map(
               (b) => (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
@@ -149,12 +184,12 @@ export default async function ComprobantePage({
           <div className="flex items-start gap-2 border-t border-border px-5 py-3.5 text-left text-[11px] leading-snug text-muted-foreground">
             <ShieldCheck className="mt-0.5 size-3.5 shrink-0" />
             Comprobante generado por PROCARD para esta operación. Prototipo
-            de demostración — el cobro no procesó un pago real.
+            de demostración — no se procesó un pago real.
           </div>
         </div>
 
         <p className="text-center text-[11px] text-muted-foreground">
-          comprobante.procard — visualización pública, sin necesidad de login
+          Guardá o compartí este comprobante — no necesita cuenta.
         </p>
       </div>
     </main>
@@ -168,6 +203,7 @@ function EmptyState() {
       ref: "OP-DEMO" + Math.random().toString(36).slice(2, 6).toUpperCase(),
       monto: "185000",
       canal: "tap2phone",
+      comercio: "Panadería Villa Morra",
       marca: "Visa",
       tarjeta: "4242",
       fecha: new Date().toISOString(),
