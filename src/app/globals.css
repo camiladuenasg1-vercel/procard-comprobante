@@ -1,0 +1,39 @@
+@import "tailwindcss";
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-border: var(--border);
+  --radius-lg: 0.875rem;
+  --radius-xl: 1.25rem;
+  --radius-2xl: 1.75rem;
+}
+
+/* Mismos tokens de marca que procard-superapp/src/app/brand.css (tema
+   claro) — sólo lo que esta página necesita, sin todo el sistema M0. */
+:root {
+  --background: #f4f4f2;
+  --foreground: #1a1a1a;
+  --card: #ffffff;
+  --card-foreground: #1a1a1a;
+  --primary: #1e5c3f;
+  --primary-foreground: #fafaf7;
+  --muted: #f2f2ef;
+  --muted-foreground: #6b6b68;
+  --success: #227a4a;
+  --success-foreground: #ffffff;
+  --border: #e4e4e1;
+}
+
+body {
+  background: var(--color-background);
+  color: var(--color-foreground);
+}
